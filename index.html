@@ -162,7 +162,7 @@ const POSITION_TOKENS=[
   {protocol:"Morpho",name:"mUSDC",address:"0x186514400e52270cef3D80e1c6F8d10A75d47A5",color:"#6C5CE7",logo:"Mo"},
 ];
 const USDC_ADDR="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-const RPC_URLS=["https://eth-mainnet.g.alchemy.com/v2/yl2Ulak6Gjivx_CeK8cKD","https://eth.llamarpc.com","https://ethereum.publicnode.com","https://rpc.ankr.com/eth"];
+const ETHERSCAN_KEY="UTE89VCQKGPBE78TMVYMMIXXZQ3SENUKJX";
 let ratesData=[], sortBy="apy";
 
 function fmtTVL(v){if(!v)return"—";if(v>=1e9)return`$${(v/1e9).toFixed(2)}B`;if(v>=1e6)return`$${(v/1e6).toFixed(0)}M`;return`$${v.toLocaleString()}`;}
@@ -170,25 +170,12 @@ function fmtUSDC(raw,dec=6){const v=Number(raw)/10**dec;if(v===0)return"0.00";if
 function isAddr(s){return/^0x[0-9a-fA-F]{40}$/.test(s);}
 function shortAddr(a){return`${a.slice(0,6)}...${a.slice(-4)}`;}
 
-async function ethCall(to,data){
-  for(const url of RPC_URLS){
-    try{
-      const ctrl=new AbortController();
-      const timer=setTimeout(()=>ctrl.abort(),8000);
-      const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to,data},"latest"]}),signal:ctrl.signal});
-      clearTimeout(timer);
-      if(!res.ok)continue;
-      const json=await res.json();
-      if(json.error||!json.result)continue;
-      return json.result;
-    }catch(e){continue;}
-  }
-  throw new Error("All RPC endpoints failed. Public nodes may be rate-limited — please try again in a moment.");
-}
 async function getBalance(token,wallet){
-  const padded=wallet.slice(2).toLowerCase().padStart(64,"0");
-  const result=await ethCall(token,"0x70a08231"+padded);
-  return BigInt(result||"0x0");
+  const url=`https://api.etherscan.io/api?module=account&action=tokenbalance&contractaddress=${token}&address=${wallet}&tag=latest&apikey=${ETHERSCAN_KEY}`;
+  const res=await fetch(url);
+  const json=await res.json();
+  if(json.status!=="1")return 0n;
+  return BigInt(json.result||"0");
 }
 async function resolveENS(name){
   try{const r=await fetch(`https://api.ensideas.com/ens/resolve/${name}`);const j=await r.json();return j?.address||null;}catch{return null;}
