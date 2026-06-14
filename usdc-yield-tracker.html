@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>USDC Yield Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background:#07070F; color:#E8E8F0; font-family:'Inter','Segoe UI',system-ui,sans-serif; min-height:100vh; padding:32px 24px; }
+  #app { max-width:740px; margin:0 auto; }
+  .tabs { display:flex; gap:4px; background:#0D0D1A; border:1px solid #1A1A2E; border-radius:8px; padding:4px; width:fit-content; margin-bottom:24px; }
+  .tab { font-size:12px; font-family:monospace; padding:6px 16px; border-radius:6px; cursor:pointer; border:none; background:transparent; color:#3A3A5C; transition:all .15s; }
+  .tab.active { background:#2775CA; color:#fff; }
+  .stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:24px; }
+  .stat-card { background:#0D0D1A; border:1px solid #1A1A2E; border-radius:10px; padding:12px 16px; }
+  .stat-label { font-size:10px; color:#3A3A5C; font-family:monospace; margin-bottom:4px; }
+  .stat-value { font-size:20px; font-weight:700; font-family:monospace; }
+  .table-wrap { border:1px solid #1A1A2E; border-radius:12px; overflow:hidden; background:#0A0A14; }
+  .table-header { display:grid; grid-template-columns:28px 36px 1fr 80px 90px 80px; gap:12px; padding:10px 20px; background:#0D0D1A; border-bottom:1px solid #1A1A2E; }
+  .table-header span { font-size:10px; font-family:monospace; letter-spacing:1px; color:#3A3A5C; }
+  .th-right { text-align:right; }
+  .sortable { cursor:pointer; }
+  .active-sort { color:#2775CA !important; }
+  .protocol-row { display:grid; grid-template-columns:28px 36px 1fr 80px 90px 80px; gap:12px; padding:14px 20px; border-bottom:1px solid #1A1A2E; align-items:center; transition:background .2s; }
+  .protocol-row:last-child { border-bottom:none; }
+  .protocol-row:hover { background:#12122A !important; }
+  .row-logo { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; font-family:monospace; }
+  .row-info { display:flex; flex-direction:column; gap:6px; }
+  .row-name-wrap { display:flex; align-items:center; gap:8px; }
+  .row-name { font-size:13px; font-weight:600; color:#E8E8F0; }
+  .row-pool { font-size:10px; color:#3A3A5C; background:#1A1A2E; border-radius:4px; padding:1px 6px; }
+  .yield-bar-bg { height:6px; background:#1A1A2E; border-radius:3px; overflow:hidden; }
+  .yield-bar-fill { height:100%; border-radius:3px; transition:width .9s cubic-bezier(0.16,1,0.3,1); width:0%; }
+  .row-apy { text-align:right; }
+  .apy-value { font-size:17px; font-weight:700; font-family:monospace; }
+  .apy-change { font-size:10px; font-family:monospace; }
+  .row-tvl { text-align:right; font-size:12px; color:#5A5A8C; font-family:monospace; }
+  .row-badge { text-align:right; }
+  .badge { font-size:10px; border-radius:4px; padding:2px 7px; font-family:monospace; }
+  .loading { padding:40px; text-align:center; }
+  .loading p { font-size:13px; font-family:monospace; color:#3A3A5C; margin-bottom:12px; }
+  .dots { display:flex; gap:6px; justify-content:center; }
+  .dot { width:6px; height:6px; border-radius:50%; background:#2775CA; animation:pulse 1.2s infinite; }
+  .dot:nth-child(2){animation-delay:.2s} .dot:nth-child(3){animation-delay:.4s}
+  @keyframes pulse{0%,100%{opacity:.2}50%{opacity:1}}
+  .table-footer { margin-top:16px; display:flex; justify-content:space-between; align-items:center; }
+  .refresh-btn { font-size:11px; color:#2775CA; background:transparent; border:1px solid #2775CA44; border-radius:6px; padding:4px 12px; cursor:pointer; font-family:monospace; }
+  .refresh-btn:hover { background:#2775CA15; }
+  .wallet-box { border:1px solid #1A1A2E; border-radius:12px; padding:20px; background:#0A0A14; }
+  .wallet-title { font-size:14px; font-weight:600; color:#E8E8F0; margin-bottom:4px; }
+  .wallet-sub { font-size:12px; color:#3A3A5C; margin-bottom:16px; }
+  .input-row { display:flex; gap:10px; margin-bottom:16px; }
+  .addr-input { flex:1; background:#0D0D1A; border:1px solid #2A2A4C; border-radius:8px; padding:10px 14px; color:#E8E8F0; font-size:13px; font-family:monospace; outline:none; transition:border-color .2s; }
+  .addr-input:focus { border-color:#2775CA; }
+  .check-btn { background:#2775CA; border:none; border-radius:8px; padding:10px 20px; color:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:monospace; white-space:nowrap; }
+  .check-btn:disabled { background:#1A1A2E; color:#3A3A5C; cursor:not-allowed; }
+  .error-box { background:#1A0A0A; border:1px solid #FF6B6B44; border-radius:8px; padding:12px 16px; font-size:12px; color:#FF6B6B; font-family:monospace; }
+  .addr-badge { display:flex; align-items:center; gap:10px; background:#0D0D1A; border:1px solid #1A1A2E; border-radius:8px; padding:10px 14px; margin-bottom:12px; }
+  .green-dot { width:8px; height:8px; border-radius:50%; background:#00D395; box-shadow:0 0 6px #00D395; flex-shrink:0; }
+  .addr-text { font-size:12px; color:#5A5A8C; font-family:monospace; }
+  .addr-chain { font-size:10px; color:#2A2A4C; font-family:monospace; margin-left:auto; }
+  .balance-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+  .balance-card { background:#0D0D1A; border-radius:10px; padding:14px 16px; }
+  .balance-label { font-size:10px; font-family:monospace; letter-spacing:1px; margin-bottom:6px; }
+  .balance-value { font-size:22px; font-weight:700; color:#E8E8F0; font-family:monospace; }
+  .balance-sub { font-size:10px; color:#3A3A5C; margin-top:2px; }
+  .positions-box { border:1px solid #1A1A2E; border-radius:10px; overflow:hidden; margin-bottom:12px; }
+  .positions-header { padding:8px 14px; background:#0D0D1A; font-size:10px; color:#3A3A5C; font-family:monospace; letter-spacing:1px; border-bottom:1px solid #1A1A2E; }
+  .position-row { display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid #1A1A2E; }
+  .position-row:last-child { border-bottom:none; }
+  .pos-logo { width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; font-family:monospace; flex-shrink:0; }
+  .pos-name { font-size:13px; font-weight:600; color:#E8E8F0; }
+  .pos-token { font-size:10px; color:#3A3A5C; font-family:monospace; }
+  .pos-right { margin-left:auto; text-align:right; }
+  .pos-balance { font-size:15px; font-weight:700; color:#E8E8F0; font-family:monospace; }
+  .pos-apy { font-size:11px; font-family:monospace; }
+  .no-positions { background:#0D0D1A; border:1px solid #1A1A2E; border-radius:10px; padding:20px 16px; text-align:center; margin-bottom:12px; }
+  .tip-box { background:#0A1A0F; border:1px solid #00D39522; border-radius:10px; padding:14px 16px; display:flex; align-items:center; gap:12px; }
+  .tip-title { font-size:12px; color:#00D395; font-weight:600; margin-bottom:2px; }
+  .tip-sub { font-size:11px; color:#5A5A8C; }
+  .page-footer { margin-top:24px; font-size:10px; color:#2A2A4C; font-family:monospace; text-align:center; }
+  .warn { font-size:11px; color:#5A5A6C; font-family:monospace; }
+  .updated { font-size:10px; color:#2A2A4C; font-family:monospace; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div style="margin-bottom:28px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <div style="width:28px;height:28px;border-radius:8px;background:#2775CA22;border:1px solid #2775CA55;display:flex;align-items:center;justify-content:center;font-size:14px">💲</div>
+      <span style="font-size:11px;color:#2775CA;font-family:monospace;letter-spacing:2px">USDC YIELD TRACKER</span>
+    </div>
+    <h1 style="font-size:28px;font-weight:800;color:#F0F0FF;letter-spacing:-.5px;line-height:1.3">
+      Where is your USDC<br><span style="color:#2775CA">working hardest?</span>
+    </h1>
+    <p style="font-size:13px;color:#5A5A8C;margin-top:10px">Live APY comparison across major DeFi lending protocols · Ethereum mainnet</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-rates" onclick="switchTab('rates')">📊 Live Rates</button>
+    <button class="tab" id="tab-wallet" onclick="switchTab('wallet')">🔍 Wallet Check</button>
+  </div>
+
+  <div id="pane-rates">
+    <div class="stats" id="stats-bar" style="display:none"></div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <span></span><span></span>
+        <span>PROTOCOL</span>
+        <span class="th-right sortable active-sort" id="sort-apy" onclick="setSort('apy')">APY ↓</span>
+        <span class="th-right sortable" id="sort-tvl" onclick="setSort('tvl')">TVL</span>
+        <span></span>
+      </div>
+      <div id="protocol-list">
+        <div class="loading"><p>Fetching live rates...</p><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>
+      </div>
+    </div>
+    <div class="table-footer">
+      <span class="warn" id="rates-warn"></span>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span class="updated" id="rates-updated"></span>
+        <button class="refresh-btn" onclick="fetchRates()">↻ Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pane-wallet" style="display:none">
+    <div class="wallet-box">
+      <div class="wallet-title">Check any Ethereum wallet</div>
+      <div class="wallet-sub">See USDC balance + active yield positions on Aave, Compound & Morpho</div>
+      <div class="input-row">
+        <input class="addr-input" id="addr-input" placeholder="0x... or vitalik.eth"
+          onkeydown="if(event.key==='Enter')checkWallet()"
+          oninput="document.getElementById('check-btn').disabled=!this.value.trim()" />
+        <button class="check-btn" id="check-btn" onclick="checkWallet()" disabled>Check Wallet</button>
+      </div>
+      <div id="wallet-result"></div>
+    </div>
+  </div>
+
+  <div class="page-footer">Data via DeFi Llama & Ethereum RPC · Read-only · Not financial advice · DYOR</div>
+</div>
+
+<script>
+const PROTOCOLS=[
+  {name:"Aave v3",pool:"Ethereum",poolId:"a349fea4-d780-4e16-973e-70ca9b606db1",color:"#B6509E",logo:"Aa"},
+  {name:"Compound v3",pool:"Ethereum",poolId:"3b0000de-0e12-4d02-a787-b1c31f3e3b18",color:"#00D395",logo:"Co"},
+  {name:"Sky (MakerDAO)",pool:"Ethereum",poolId:"9ba19cf6-6666-4fce-a02e-db43e5a60f2a",color:"#1AAB9B",logo:"Sk"},
+  {name:"Morpho",pool:"Ethereum",poolId:"ca256990-cd00-4bd5-a5ce-d7f40b9c7e21",color:"#6C5CE7",logo:"Mo"},
+  {name:"Fluid",pool:"Ethereum",poolId:"efbfba17-5ae5-4e8b-aaa0-31f8bf65a0ea",color:"#0984E3",logo:"Fl"},
+];
+const FALLBACK=[
+  {name:"Aave v3",pool:"Ethereum",apy:4.82,tvlUsd:1200000000,color:"#B6509E",logo:"Aa",change:0.12},
+  {name:"Compound v3",pool:"Ethereum",apy:4.61,tvlUsd:890000000,color:"#00D395",logo:"Co",change:-0.08},
+  {name:"Sky (MakerDAO)",pool:"Ethereum",apy:6.00,tvlUsd:2100000000,color:"#1AAB9B",logo:"Sk",change:0},
+  {name:"Morpho",pool:"Ethereum",apy:5.21,tvlUsd:430000000,color:"#6C5CE7",logo:"Mo",change:0.31},
+  {name:"Fluid",pool:"Ethereum",apy:4.35,tvlUsd:210000000,color:"#0984E3",logo:"Fl",change:-0.05},
+];
+const POSITION_TOKENS=[
+  {protocol:"Aave v3",name:"aUSDC",address:"0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5",color:"#B6509E",logo:"Aa"},
+  {protocol:"Compound v3",name:"cUSDCv3",address:"0xc3d688B66703497DAA19211EEdff47f25384cdc3",color:"#00D395",logo:"Co"},
+  {protocol:"Morpho",name:"mUSDC",address:"0x186514400e52270cef3D80e1c6F8d10A75d47A5",color:"#6C5CE7",logo:"Mo"},
+];
+const USDC_ADDR="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const RPC_URLS=["https://cloudflare-eth.com","https://ethereum.publicnode.com","https://rpc.ankr.com/eth","https://eth.llamarpc.com"];
+let ratesData=[], sortBy="apy";
+
+function fmtTVL(v){if(!v)return"—";if(v>=1e9)return`$${(v/1e9).toFixed(2)}B`;if(v>=1e6)return`$${(v/1e6).toFixed(0)}M`;return`$${v.toLocaleString()}`;}
+function fmtUSDC(raw,dec=6){const v=Number(raw)/10**dec;if(v===0)return"0.00";if(v>=1e6)return`${(v/1e6).toFixed(2)}M`;if(v>=1e3)return`${(v/1e3).toFixed(2)}K`;return v.toFixed(2);}
+function isAddr(s){return/^0x[0-9a-fA-F]{40}$/.test(s);}
+function shortAddr(a){return`${a.slice(0,6)}...${a.slice(-4)}`;}
+
+async function ethCall(to,data){
+  for(const url of RPC_URLS){
+    try{
+      const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to,data},"latest"]})});
+      if(!res.ok)continue;
+      const json=await res.json();
+      if(json.error)continue;
+      return json.result;
+    }catch{}
+  }
+  throw new Error("All RPC endpoints failed. Please try again.");
+}
+async function getBalance(token,wallet){
+  const padded=wallet.slice(2).toLowerCase().padStart(64,"0");
+  const result=await ethCall(token,"0x70a08231"+padded);
+  return BigInt(result||"0x0");
+}
+async function resolveENS(name){
+  try{const r=await fetch(`https://api.ensideas.com/ens/resolve/${name}`);const j=await r.json();return j?.address||null;}catch{return null;}
+}
+
+function switchTab(t){
+  document.getElementById("pane-rates").style.display=t==="rates"?"":"none";
+  document.getElementById("pane-wallet").style.display=t==="wallet"?"":"none";
+  document.getElementById("tab-rates").classList.toggle("active",t==="rates");
+  document.getElementById("tab-wallet").classList.toggle("active",t==="wallet");
+}
+
+function setSort(s){
+  sortBy=s;
+  document.getElementById("sort-apy").textContent="APY"+(s==="apy"?" ↓":"");
+  document.getElementById("sort-tvl").textContent="TVL"+(s==="tvl"?" ↓":"");
+  document.getElementById("sort-apy").classList.toggle("active-sort",s==="apy");
+  document.getElementById("sort-tvl").classList.toggle("active-sort",s==="tvl");
+  renderRates();
+}
+
+function renderRates(){
+  const sorted=[...ratesData].sort((a,b)=>sortBy==="apy"?b.apy-a.apy:b.tvlUsd-a.tvlUsd);
+  const maxApy=sorted[0]?.apy||1;
+  const avgApy=(ratesData.reduce((s,d)=>s+d.apy,0)/ratesData.length).toFixed(2);
+  const sb=document.getElementById("stats-bar");
+  sb.style.display="grid";
+  sb.innerHTML=[
+    {label:"Best APY",value:`${sorted[0].apy.toFixed(2)}%`,color:sorted[0].color},
+    {label:"Avg APY",value:`${avgApy}%`,color:"#2775CA"},
+    {label:"Protocols",value:ratesData.length,color:"#5A5A8C"},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.label}</div><div class="stat-value" style="color:${s.color}">${s.value}</div></div>`).join("");
+
+  document.getElementById("protocol-list").innerHTML=sorted.map((item,i)=>{
+    const best=i===0;
+    const change=item.change??0;
+    const pct=(item.apy/maxApy*100).toFixed(1);
+    const cc=change>0?"#00D395":change<0?"#FF6B6B":"#3A3A5C";
+    const cs=change!==0?(change>0?"+":"")+change.toFixed(2)+"%":"—";
+    const hi=item.apy>5.5;
+    return`<div class="protocol-row" style="background:${best?"#0F0F1E":"transparent"}">
+      <span style="font-size:11px;font-weight:700;font-family:monospace;color:${best?"#FFD700":"#3A3A5C"}">${best?"★":"#"+(i+1)}</span>
+      <div class="row-logo" style="background:${item.color}22;border:1px solid ${item.color}55;color:${item.color}">${item.logo}</div>
+      <div class="row-info">
+        <div class="row-name-wrap"><span class="row-name">${item.name}</span><span class="row-pool">${item.pool}</span></div>
+        <div class="yield-bar-bg"><div class="yield-bar-fill" data-pct="${pct}" style="background:${item.color};box-shadow:0 0 8px ${item.color}88"></div></div>
+      </div>
+      <div class="row-apy"><div class="apy-value" style="color:${item.color}">${item.apy.toFixed(2)}%</div><div class="apy-change" style="color:${cc}">${cs}</div></div>
+      <div class="row-tvl">${fmtTVL(item.tvlUsd)}</div>
+      <div class="row-badge"><span class="badge" style="color:${hi?"#FFD700":"#3A8C6C"};background:${hi?"#FFD70015":"#00D39515"};border:1px solid ${hi?"#FFD70040":"#00D39540"}">${hi?"HIGH YIELD":"STABLE"}</span></div>
+    </div>`;
+  }).join("");
+
+  requestAnimationFrame(()=>setTimeout(()=>{
+    document.querySelectorAll(".yield-bar-fill").forEach(el=>{el.style.width=el.dataset.pct+"%";});
+  },80));
+}
+
+async function fetchRates(){
+  document.getElementById("protocol-list").innerHTML=`<div class="loading"><p>Fetching live rates...</p><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;
+  document.getElementById("stats-bar").style.display="none";
+  document.getElementById("rates-warn").textContent="";
+  try{
+    const results=await Promise.allSettled(PROTOCOLS.map(p=>
+      fetch(`https://yields.llama.fi/chart/${p.poolId}`).then(r=>r.json()).then(json=>{
+        const arr=json.data;const latest=arr?.[arr.length-1];const prev=arr?.[arr.length-2];
+        return{name:p.name,pool:p.pool,color:p.color,logo:p.logo,apy:latest?.apy??null,tvlUsd:latest?.tvlUsd??null,change:latest&&prev?+(latest.apy-prev.apy).toFixed(2):0};
+      })
+    ));
+    const valid=results.map(r=>r.status==="fulfilled"?r.value:null).filter(r=>r&&r.apy!==null);
+    if(!valid.length)throw new Error();
+    ratesData=valid;
+  }catch{
+    ratesData=FALLBACK;
+    document.getElementById("rates-warn").textContent="⚠ Live data unavailable — showing cached snapshot.";
+  }
+  document.getElementById("rates-updated").textContent="Updated "+new Date().toLocaleTimeString();
+  renderRates();
+}
+
+async function checkWallet(){
+  const btn=document.getElementById("check-btn");
+  const res=document.getElementById("wallet-result");
+  let addr=document.getElementById("addr-input").value.trim();
+  res.innerHTML=`<div class="loading"><p>Reading on-chain data...</p><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`;
+  btn.disabled=true; btn.textContent="Checking...";
+  try{
+    if(addr.endsWith(".eth")){const r=await resolveENS(addr);if(!r)throw new Error(`Could not resolve ENS: ${addr}`);addr=r;}
+    if(!isAddr(addr))throw new Error("Invalid Ethereum address.");
+    const[usdcRaw,...posRaws]=await Promise.all([getBalance(USDC_ADDR,addr),...POSITION_TOKENS.map(pt=>getBalance(pt.address,addr))]);
+    const usdcBal=fmtUSDC(usdcRaw,6);
+    const totalDep=POSITION_TOKENS.reduce((s,_,i)=>s+Number(posRaws[i])/1e6,0);
+    const positions=POSITION_TOKENS.map((pt,i)=>({...pt,balance:fmtUSDC(posRaws[i],6),raw:Number(posRaws[i])/1e6,hasPos:posRaws[i]>0n,apy:(ratesData.find(r=>r.name===pt.protocol)||{}).apy||null})).filter(p=>p.hasPos);
+    const bestProto=[...ratesData].sort((a,b)=>b.apy-a.apy)[0];
+    const yearlyEarn=totalDep>0&&bestProto?(totalDep*(bestProto.apy/100)).toFixed(2):null;
+    res.innerHTML=`
+      <div class="addr-badge"><div class="green-dot"></div><span class="addr-text">${shortAddr(addr)}</span><span class="addr-chain">Ethereum Mainnet</span></div>
+      <div class="balance-cards">
+        <div class="balance-card" style="border:1px solid #2775CA33"><div class="balance-label" style="color:#2775CA">USDC BALANCE</div><div class="balance-value">${usdcBal}</div><div class="balance-sub">in wallet</div></div>
+        <div class="balance-card" style="border:1px solid #00D39533"><div class="balance-label" style="color:#00D395">TOTAL DEPOSITED</div><div class="balance-value">${totalDep>0?fmtUSDC(totalDep*1e6,6):"0.00"}</div><div class="balance-sub">earning yield</div></div>
+      </div>
+      ${positions.length?`<div class="positions-box"><div class="positions-header">ACTIVE POSITIONS</div>${positions.map(p=>`
+        <div class="position-row">
+          <div class="pos-logo" style="background:${p.color}22;border:1px solid ${p.color}55;color:${p.color}">${p.logo}</div>
+          <div><div class="pos-name">${p.protocol}</div><div class="pos-token">${p.name}</div></div>
+          <div class="pos-right"><div class="pos-balance">${p.balance} <span style="font-size:10px;color:#3A3A5C">USDC</span></div>${p.apy?`<div class="pos-apy" style="color:${p.color}">@ ${p.apy.toFixed(2)}% APY</div>`:""}</div>
+        </div>`).join("")}</div>`:`<div class="no-positions"><div style="font-size:13px;color:#3A3A5C;margin-bottom:4px">No active positions found</div><div style="font-size:11px;color:#2A2A4C;font-family:monospace">This wallet is not depositing USDC on Aave, Compound, or Morpho</div></div>`}
+      ${yearlyEarn&&bestProto?`<div class="tip-box"><div style="font-size:20px">💡</div><div><div class="tip-title">Move all to ${bestProto.name} (${bestProto.apy.toFixed(2)}% APY)</div><div class="tip-sub">You'd earn ~<span style="color:#E8E8F0;font-family:monospace">$${yearlyEarn}</span> more per year</div></div></div>`:""}`;
+  }catch(e){
+    res.innerHTML=`<div class="error-box">⚠ ${e.message}</div>`;
+  }finally{btn.disabled=false;btn.textContent="Check Wallet";}
+}
+
+fetchRates();
+</script>
+</body>
+</html>
