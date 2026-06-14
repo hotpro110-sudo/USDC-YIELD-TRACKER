@@ -162,7 +162,7 @@ const POSITION_TOKENS=[
   {protocol:"Morpho",name:"mUSDC",address:"0x186514400e52270cef3D80e1c6F8d10A75d47A5",color:"#6C5CE7",logo:"Mo"},
 ];
 const USDC_ADDR="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-const RPC_URLS=["https://cloudflare-eth.com","https://ethereum.publicnode.com","https://rpc.ankr.com/eth","https://eth.llamarpc.com"];
+const RPC_URLS=["https://eth.llamarpc.com","https://ethereum.publicnode.com","https://rpc.ankr.com/eth","https://cloudflare-eth.com","https://rpc.flashbots.net","https://virginia.rpc.blxrbdn.com","https://uk.rpc.blxrbdn.com","https://singapore.rpc.blxrbdn.com"];
 let ratesData=[], sortBy="apy";
 
 function fmtTVL(v){if(!v)return"—";if(v>=1e9)return`$${(v/1e9).toFixed(2)}B`;if(v>=1e6)return`$${(v/1e6).toFixed(0)}M`;return`$${v.toLocaleString()}`;}
@@ -173,14 +173,17 @@ function shortAddr(a){return`${a.slice(0,6)}...${a.slice(-4)}`;}
 async function ethCall(to,data){
   for(const url of RPC_URLS){
     try{
-      const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to,data},"latest"]})});
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(),8000);
+      const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"eth_call",params:[{to,data},"latest"]}),signal:ctrl.signal});
+      clearTimeout(timer);
       if(!res.ok)continue;
       const json=await res.json();
-      if(json.error)continue;
+      if(json.error||!json.result)continue;
       return json.result;
-    }catch{}
+    }catch(e){continue;}
   }
-  throw new Error("All RPC endpoints failed. Please try again.");
+  throw new Error("All RPC endpoints failed. Public nodes may be rate-limited — please try again in a moment.");
 }
 async function getBalance(token,wallet){
   const padded=wallet.slice(2).toLowerCase().padStart(64,"0");
