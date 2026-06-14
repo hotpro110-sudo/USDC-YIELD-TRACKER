@@ -162,7 +162,7 @@ const POSITION_TOKENS=[
   {protocol:"Morpho",name:"mUSDC",address:"0x186514400e52270cef3D80e1c6F8d10A75d47A5",color:"#6C5CE7",logo:"Mo"},
 ];
 const USDC_ADDR="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
-const RPC_URLS=["https://eth.llamarpc.com","https://ethereum.publicnode.com","https://rpc.ankr.com/eth","https://cloudflare-eth.com","https://rpc.flashbots.net","https://virginia.rpc.blxrbdn.com","https://uk.rpc.blxrbdn.com","https://singapore.rpc.blxrbdn.com"];
+const RPC_URLS=["https://eth-mainnet.g.alchemy.com/v2/yl2Ulak6Gjivx_CeK8cKD","https://eth.llamarpc.com","https://ethereum.publicnode.com","https://rpc.ankr.com/eth"];
 let ratesData=[], sortBy="apy";
 
 function fmtTVL(v){if(!v)return"—";if(v>=1e9)return`$${(v/1e9).toFixed(2)}B`;if(v>=1e6)return`$${(v/1e6).toFixed(0)}M`;return`$${v.toLocaleString()}`;}
